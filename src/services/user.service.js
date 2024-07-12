@@ -27,6 +27,10 @@ export const getAllUsers = async () => {
     return await userSchema.findByIdAndUpdate(id, user);
   };
    
-  export const deleteUser = async (id) => {
+  export const hardDeleteUser = async (id) => {
     return await userSchema.findByIdAndDelete(id);
+  };
+
+  export const softDeleteUser = async (id) => {
+    return await userSchema.findByIdAndUpdate(id, {status: 'INACTIVE'});
   };

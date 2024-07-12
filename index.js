@@ -2,16 +2,19 @@ import express from 'express'
 import mongoose from 'mongoose'
 import http from 'http'
 import { Server } from 'socket.io';
+import fileUpload from 'express-fileupload'
 import cors from 'cors';
-// import authRoutes from "./routes/auth.routes.js";
-// import userRoutes from "./routes/user.routes.js";
-import {config} from "./config/db_config.js";
+import authRoutes from "./src/routes/auth.routes.js";
+import userRoutes from "./src/routes/user.routes.js";
+import hospitalRoutes from "./src/routes/hospital.routes.js";
+import roleRoutes from "./src/routes/role.routes.js";
+import {config} from "./src/config/db.config.js";
 import dotenv from 'dotenv-flow';
 dotenv.config({ path: 'local.env' });
 import bodyParser from 'body-parser';
 
-//const url = process.env.MONGODB_URI || `mongodb://${config.dbhost}:${config.dbport}/${config.dbname}`;
-const url = process.env.MONGODB_URI;
+const url = `mongodb://${config.dbhost}:${config.dbport}/${config.dbname}`;
+//const url = process.env.MONGODB_URI;
 let retries = 15;
 
 const connectWithRetry = () => {
@@ -44,14 +47,17 @@ export const serverio = new Server(server, {
 app.use(cors())
 app.use(express.json());
 app.use(bodyParser.json());
-connectWithRetry();;
+app.use(fileUpload())
+connectWithRetry();
 
 app.get("/", (req, res) => {
     res.send("<center><h1 style='margin-top: 20%;color:#0d7dd6;'>WELCOME TO CIDRA</h1><h2 style='color:#0d7dd6;'>BACKEND API</h2></center>")
 });
 
-// app.use("/api/auth", authRoutes)
-// app.use("/api/user", userRoutes)
+app.use("/api/auth", authRoutes)
+app.use("/api/user", userRoutes)
+app.use("/api/role", roleRoutes);
+app.use("/api/hospital", hospitalRoutes);
 
 app.get("*", (req, res)=>{
     res.status(404).json({message:`Route ${req.path} not found`})
