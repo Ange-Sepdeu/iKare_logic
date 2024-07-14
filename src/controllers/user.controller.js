@@ -45,8 +45,15 @@ export const registerSuperAdmin = async (req, res) => {
 
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await userService.getAllUsers();
-    res.json({ data: users, status: "success", message: 'Fetch users successfully !!!' }).status(200);
+    const patientsAndSuper = await userService.getAllUsers();
+    const hospitals = await hospitalService.getAllHospitals()
+    var doctorsAdmins = [];
+    for (let hospital of hospitals) {
+        doctorsAdmins.push(hospital.admin)
+        doctorsAdmins = [...doctorsAdmins, ...hospital.doctors]
+    }
+    var allUsers = [...patientsAndSuper, ...doctorsAdmins]
+    res.json({ data: allUsers, status: "success", message: 'Fetch users successfully !!!' }).status(200);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

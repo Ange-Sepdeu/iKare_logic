@@ -9,8 +9,8 @@ const notifications = new Schema({
       type: Date,
       default: Date.now
     },
-    socket: String,
-    from: String,
+    sender: String,
+    receiver: String,
     documents: {
       type: [String],
       default: null
@@ -85,6 +85,10 @@ export const userSchema = new Schema({
   email: String,
   tel: String,
   password:String,
+  socket: {
+    type: String,
+    default: null
+  },
   status: {
     type: String,
     enum: ['PENDING', 'ACTIVE', 'INACTIVE'],
