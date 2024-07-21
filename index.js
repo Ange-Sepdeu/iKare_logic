@@ -91,6 +91,20 @@ serverio.on('connection', (socket) => {
             const saved = await hospital.save()
         }
     })
+    socket.on("send-mobile-socket", async(data) => {
+        if (data.userRole=="PATIENT") {
+            const updated = await userSchema.findByIdAndUpdate(data._id, {mobileSocket:socket.id})
+        }
+        else if (data.userRole == "DOCTOR") {
+            const hospital = await hospitalService.getHospitalById(data.hospital_id);
+            hospital.doctors.forEach(doctor => {
+                if (doctor._id == data._id){
+                    doctor.mobileSocket = socket.id
+                }
+            })
+            const saved = await hospital.save()
+        }
+    })
     socket.on("send-message", async(data) => {
         const sender = data?.sender
         const receiver = data?.receiver
@@ -99,6 +113,22 @@ serverio.on('connection', (socket) => {
         try {
             const receiverObject = await getAndSaveObject(receiver, {...data, date: new Date(time)})
             const receiverSocketId = receiverObject.socket
+            console.log("Receiver Socket Id", receiverSocketId, "message: ", message)
+            // serverio.to(receiverSocketId).emit("private-message", {sender, message, time})
+            serverio.emit("private-message", {sender, message, time})
+            const senderObject = await getAndSaveObject(sender, {...data, date: new Date(time)});
+            console.log("Success !")
+        }
+        catch(error) {console.log(error)}    
+    })
+    socket.on("send-mobile-message", async(data) => {
+        const sender = data?.sender
+        const receiver = data?.receiver
+        const message = data?.message
+        const time = data?.time
+        try {
+            const receiverObject = await getAndSaveObject(receiver, {...data, date: new Date(time)})
+            const receiverSocketId = receiverObject.mobileSocket
             console.log("Receiver Socket Id", receiverSocketId, "message: ", message)
             // serverio.to(receiverSocketId).emit("private-message", {sender, message, time})
             serverio.emit("private-message", {sender, message, time})

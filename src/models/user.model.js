@@ -89,6 +89,10 @@ export const userSchema = new Schema({
     type: String,
     default: null
   },
+  mobileSocket: {
+    type: String,
+    default: null
+  },
   status: {
     type: String,
     enum: ['PENDING', 'ACTIVE', 'INACTIVE'],
