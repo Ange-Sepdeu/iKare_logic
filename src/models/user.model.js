@@ -3,6 +3,20 @@ import mongoose from "mongoose";
 import validator from "validator";
 const Schema = mongoose.Schema;
 
+const questionAnswer = new Schema({
+  date: {
+    type: String,
+    default: Date.now
+  },
+  question: String,
+  answer: String
+})
+
+const followupSchema = new Schema({
+  source: String,
+  communication: [questionAnswer]
+})
+
 const notifications = new Schema({
     message: String,
     date: {
@@ -39,11 +53,13 @@ const ehrSchema = new Schema({
 const prescriptionSchema = new Schema({
   drug: String,
   quantity: Number,
+  diagnosis: String,
   info: String,
   prescription_date: {
     type: Date,
     default: Date.now
-  }
+  },
+  followup: [followupSchema]
 })
 
 const consultationSchema = new Schema({
@@ -58,7 +74,7 @@ const consultationSchema = new Schema({
       default: "ONGOING"
     },
     prescription: {
-      type: [prescriptionSchema],
+      type: prescriptionSchema,
       default: null
     },
     user: String
