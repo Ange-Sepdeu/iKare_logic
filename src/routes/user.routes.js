@@ -1,8 +1,9 @@
 import express from 'express'
-import { getAllUsers,createUser,getUserById,updateUser,deleteUser, bookAppointment, updateAppointmentDetails, respondToAppointment, deleteAppointment, registerSuperAdmin } from '../controllers/user.controller.js';
+import { getAllUsers,createUser,getUserById,updateUser,deleteUser, bookAppointment, updateAppointmentDetails, respondToAppointment, deleteAppointment, registerSuperAdmin, setReadMessages } from '../controllers/user.controller.js';
 import { auth } from '../middleware/auth.js';
-import { deletePrescription, endConsultation, issuePrescription, responseToForm, sendFollowUpForm, startConsultation } from '../controllers/consultation.controller.js';
+import { deletePrescription, endConsultation, issuePrescription, responseToForm, sendFollowUpForm, startConsultation} from '../controllers/consultation.controller.js';
 import { addEhr } from '../controllers/ehr.controller.js';
+import {initiatePayment} from "../controllers/payment.controller.js";
 
 const router = express.Router()
 
@@ -23,5 +24,7 @@ router.route("/delete-prescription").post(deletePrescription)
 router.route("/send-followup-form").post(sendFollowUpForm)
 router.route("/response-to-form").post(responseToForm)
 router.route("/submit-ehr").post(addEhr);
+router.route("/read-messages").post(setReadMessages);
+router.route("/make-payment").post(initiatePayment);
 
 export default router;

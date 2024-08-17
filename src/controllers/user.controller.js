@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import * as userService from "../services/user.service.js";
+import userSchema from "../models/user.model.js"
 import { generateString, mailMessages } from "../utils/helper.js";
 import { getOneToken,createToken } from "../services/token.service.js";
 import { SENDMAIL } from "../utils/sendmail.js";
@@ -98,7 +99,7 @@ export const createUser = async (req, res) => {
 
 export const getUserById = async (req, res) => {
   try {
-    if (!req.body.hospitalName){
+    if (req.body?.role == "PATIENT"){
     const user = await userService.getUserById(req.body.id);
     if (user !== null) return res.json({ data: user, status: "success", message: 'User found !!!' }).status(200);
     return res.json({ data: user, status: "success", message: `No user found with id: ${id}` }).status(401);
@@ -145,7 +146,10 @@ export const bookAppointment = async (req, res) => {
       patientAppointments.forEach(appt => {
         const apptDate = new Date(appt.date).toISOString();
         if (parseDate === apptDate)
-          return res.status(400).json({message: "You got an appointment at the chosen date and time"});
+        {
+          res.status(400).json({message: "An appointment has been booked at the chosen date and time"});
+          return
+        }
       })
       const commonId = "appointment"+new Date().getTime();
       const patientAppointmentObject = {
@@ -162,9 +166,11 @@ export const bookAppointment = async (req, res) => {
           return res.status(200).json({message: "Appointment booked successfully !"});
       }catch(error) {
         console.error(error);
+        res.status(500).json({message: "Retry again, an error occurred !"})
       }
     }catch(error) {
       console.error(error);
+      res.status(500).json({message: "Retry again, an error occurred !"})
     }
 }
 
@@ -250,4 +256,58 @@ export const updateAppointmentDetails = async (req, res) => {
   }catch(error) {
     console.error(error);
   } 
+}
+
+async function saveObject(sender, receiver){
+  try {
+    const hospitals = await hospitalService.getAllHospitals()
+  var userObject = null
+  var selectedHospital
+  for (let hospital of hospitals) {
+    selectedHospital = hospital
+    userObject = hospital.doctors.find(doc => doc._id==sender)
+      if (!userObject){
+          if (sender == selectedHospital.admin._id) {
+              userObject = selectedHospital.admin
+              break
+          }
+      }
+  }
+  if (!userObject)
+    {
+        userObject = await userSchema.findById(sender)
+        userObject.notifications.forEach(notif => {
+          if (notif.receiver == receiver)
+          {
+            notif.status = "READ"
+          }
+        })
+        userObject.save()
+    }
+    else{
+        userObject.notifications.forEach(notif => {
+          if (notif.receiver == receiver)
+          {
+            notif.status = "READ"
+          }
+        }) 
+      await selectedHospital.save()
+    }
+    return userObject
+  }
+  catch(error) {
+    console.log(error)
+  }
+}
+
+export const setReadMessages = async (req, res) => {
+  try {
+      const {sender, receiver} = req.body;
+      const senderObject = await saveObject(sender, receiver)
+      const receiverObject = await saveObject(receiver, sender)
+      return res.status(200).json({message: "Success !", data:receiverObject.notifications.filter(not => not.sender == sender && not.status=="PENDING").length})
+  } catch(error) {
+    console.log(error)
+    return res.status(500).json({message: error.message})
+  }
 }

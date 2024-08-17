@@ -78,6 +78,11 @@ export const issuePrescription = async(req, res) => {
               appt.consultation.prescription = prescription;
           }
       })
+      patientObject.ehr.push({
+        details: prescription?.diagnosis,
+        lab: doctorObj?._id,
+        doctor: doctorObj?.fullname
+      })
       try {
         const booked = patientObject.save();
         const isBooked = hospitalObj.save();

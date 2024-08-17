@@ -5,7 +5,7 @@ const Schema = mongoose.Schema;
 
 const questionAnswer = new Schema({
   date: {
-    type: String,
+    type: Date,
     default: Date.now
   },
   question: String,

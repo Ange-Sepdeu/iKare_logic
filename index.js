@@ -10,11 +10,16 @@ import * as hospitalService from "./src/services/hospital.service.js"
 import userSchema from './src/models/user.model.js';
 import hospitalRoutes from "./src/routes/hospital.routes.js";
 import roleRoutes from "./src/routes/role.routes.js";
+import pharmacyRoutes from "./src/routes/pharmacy.routes.js";
 import {config} from "./src/config/db.config.js";
 import dotenv from 'dotenv-flow';
+import InMemorySessionStore from "./src/utils/sessionStore.js";
+import crypto from "crypto"
 dotenv.config({ path: 'local.env' });
 import path from "path"
 import { fileURLToPath } from 'url';
+import fs from "fs"
+import {uploadFile} from "./src/utils/saveFile.js"
 
 const url = `mongodb://${config.dbhost}:${config.dbport}/${config.dbname}`;
 //const url = process.env.MONGODB_URI;
@@ -54,12 +59,19 @@ const connectWithRetry = () => {
 };
 
 async function getAndSaveObject(id, data) {
+    try {
     const hospitals = await hospitalService.getAllHospitals()
     var userObject = null
     var selectedHospital
     for (let hospital of hospitals) {
         selectedHospital = hospital
         userObject = hospital.doctors.find(doc => doc._id==id)
+        if (!userObject){
+            if (id == selectedHospital.admin._id) {
+                userObject = selectedHospital.admin
+                break
+            }
+        }
     }
     if (!userObject)
     {
@@ -72,43 +84,110 @@ async function getAndSaveObject(id, data) {
        await selectedHospital.save()
     }
     return userObject
+    }
+    catch(error) {
+        console.log("GET SAVE OBJECT ERR: ", error)
+    }
 }
 
-// serverio.use((socket, next) => {
-//     const sessionID = socket.handshake.auth.sessionID
-//     if (sessionID) {
-//         const session = session
-//     }
-// })
+const randomId = () => crypto.randomBytes(8).toString("hex");
+const sessionStore = new InMemorySessionStore();
+
+serverio.use((socket, next) => {
+    const sessionID = socket.handshake.auth.sessionID;
+    if (sessionID) {
+      const session = sessionStore.findSession(sessionID);
+      if (session) {
+        socket.sessionID = sessionID;
+        socket.userID = session.userID;
+        return next();
+      }
+    }
+    
+    socket.sessionID = randomId();
+    socket.userID = randomId();
+    next();
+  });
 
 serverio.on('connection', (socket) => {
+    sessionStore.saveSession(socket.sessionID, {
+        userID: socket.userID,
+        connected: true
+    })
+    socket.emit("session", {
+        sessionID: socket.sessionID,
+        userID: socket.userID
+    })
     socket.on("send-id", async(data) => {
+        const room = randomId()
         if (data.userRole=="PATIENT") {
-            const updated = await userSchema.findByIdAndUpdate(data._id, {socket:socket.id})
+            const updated = await userSchema.findByIdAndUpdate(data._id, {socket:room})
         }
         else if (data.userRole == "DOCTOR") {
             const hospital = await hospitalService.getHospitalById(data.hospital_id);
             hospital.doctors.forEach(doctor => {
                 if (doctor._id == data._id){
-                    doctor.socket = socket.id
+                    doctor.socket = room
                 }
             })
             const saved = await hospital.save()
         }
+        socket.join(room)
     })
     socket.on("send-mobile-socket", async(data) => {
+        const room = randomId()
         if (data.userRole=="PATIENT") {
-            const updated = await userSchema.findByIdAndUpdate(data._id, {mobileSocket:socket.id})
+            const updated = await userSchema.findByIdAndUpdate(data._id, {mobileSocket:room})
         }
         else if (data.userRole == "DOCTOR") {
             const hospital = await hospitalService.getHospitalById(data.hospital_id);
             hospital.doctors.forEach(doctor => {
                 if (doctor._id == data._id){
-                    doctor.mobileSocket = socket.id
+                    doctor.mobileSocket = room
                 }
             })
             const saved = await hospital.save()
         }
+        socket.join(room)
+    })
+    socket.on("attach-document", async (data) => {
+            const relativePath = "/src/uploads/"+data.sender+"/chat/"
+            const uploadsDir = __dirname+relativePath;
+            const documents = []
+            if (!fs.existsSync(uploadsDir))
+                fs.mkdirSync(uploadsDir, {recursive:true})
+            for (let i=0;i<data.length;i++)
+            {
+                const fullPath = uploadsDir+data.filenames[i]
+                documents.push(relativePath+data.filenames[i]);
+                fs.writeFileSync(fullPath, data.files[i], {encoding: "base64"}, err => {
+                    console.log("message: ", err ? "failure":"success")
+                })
+            }
+            const receiverObject = await getAndSaveObject(data.receiver, {...data, date: new Date(data.time), documents})
+            const receiverSocketId = receiverObject.socket
+            const senderObject = await getAndSaveObject(data.sender, {...data, date: new Date(data.time), documents});
+            serverio.to(receiverSocketId).to(receiverObject.mobileSocket).emit("private-message", {sender:data.sender, message:data.message, time:data.time, documents})
+     })
+     socket.on("attach-mobile-document", async (data) => {
+        const relativePath = "/src/uploads/"+data.sender+"/chat/"
+        const uploadsDir = __dirname+relativePath;
+        const documents = []
+        if (!fs.existsSync(uploadsDir))
+            fs.mkdirSync(uploadsDir, {recursive:true})
+        for (let i=0;i<data?.files.length;i++)
+        {
+            const file = data.files[i];
+            const fullPath = uploadsDir+file.fileName;
+            documents.push(relativePath+file.fileName);
+            fs.writeFileSync(fullPath, file.base64, {encoding: "base64"}, err => {
+                console.log("message: ", err ? "failure":"success")
+            })
+        }
+        const receiverObject = await getAndSaveObject(data.receiver, {...data, date: new Date(data.time), documents})
+        const receiverSocketId = receiverObject.socket
+        const senderObject = await getAndSaveObject(data.sender, {...data, date: new Date(data.time), documents});
+        serverio.to(receiverSocketId).to(receiverObject.mobileSocket).emit("private-message", {sender:data.sender, message:data.message, time:data.time, documents})
     })
     socket.on("send-message", async(data) => {
         const sender = data?.sender
@@ -118,13 +197,12 @@ serverio.on('connection', (socket) => {
         try {
             const receiverObject = await getAndSaveObject(receiver, {...data, date: new Date(time)})
             const receiverSocketId = receiverObject.socket
-            console.log("Receiver Socket Id", receiverSocketId, "message: ", message)
-            // serverio.to(receiverSocketId).emit("private-message", {sender, message, time})
-            serverio.emit("private-message", {sender, message, time})
+            serverio.to(receiverSocketId).to(receiverObject.mobileSocket).emit("private-message", {sender, message, time, documents:[]})
             const senderObject = await getAndSaveObject(sender, {...data, date: new Date(time)});
-            console.log("Success !")
         }
-        catch(error) {console.log(error)}    
+        catch(error) {
+            console.log(error)
+        }    
     })
     socket.on("send-mobile-message", async(data) => {
         const sender = data?.sender
@@ -134,11 +212,8 @@ serverio.on('connection', (socket) => {
         try {
             const receiverObject = await getAndSaveObject(receiver, {...data, date: new Date(time)})
             const receiverSocketId = receiverObject.mobileSocket
-            console.log("Receiver Socket Id", receiverSocketId, "message: ", message)
-            // serverio.to(receiverSocketId).emit("private-message", {sender, message, time})
-            serverio.emit("private-message", {sender, message, time})
+            serverio.to(receiverSocketId).to(receiverObject.socket).emit("private-message", {sender, message, time, documents:[]})
             const senderObject = await getAndSaveObject(sender, {...data, date: new Date(time)});
-            console.log("Success !")
         }
         catch(error) {console.log(error)}    
     })
@@ -154,6 +229,7 @@ app.use("/api/auth", authRoutes)
 app.use("/api/user", userRoutes)
 app.use("/api/role", roleRoutes);
 app.use("/api/hospital", hospitalRoutes);
+app.use("/api/pharmacy", pharmacyRoutes);
 
 app.get("*", (req, res)=>{
     res.status(404).json({message:`Route ${req.path} not found`})

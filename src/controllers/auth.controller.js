@@ -39,16 +39,7 @@ export const loginUser= async (req,res)=>{
                     doctorHospital = hospital
                 }
             }
-            // hospitals.forEach(async (hospital) => {
-            //     user = hospital.doctors.find(doc => doc.email===req.body.email)
-            //     if (user) {
-            //         const doctorPass = user.password;
-            //         const isDoctorPassValid = await bcrypt.compare(req.body.password, doctorPass)
-            //         if (!isDoctorPassValid) return res.status(400).json({ message: 'No user found with these credentials' })
-            //         userExist = true
-            //         doctorHospital = hospital
-            //     }
-            // })
+            console.log("USER: ", user, "USER EXISTS ", userExist)
             if (!userExist){
                 user = await userService.getUserByEmail(req.body.email)
                 if(!user) return res.status(400).json({ message: 'No user found with these credentials' });

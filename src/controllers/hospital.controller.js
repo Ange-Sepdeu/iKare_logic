@@ -78,7 +78,7 @@ export const addDoctor = async (req, res) => {
         const doctorAdded = dbHospital.doctors.push(newDoc)
         try {
             const saved = dbHospital.save();
-            return res.status(400).json({message: "New doctor added successfully !"});
+            return res.status(200).json({message: "New doctor added successfully !"});
         }
         catch(error) {
             console.error(error)
