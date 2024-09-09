@@ -124,25 +124,42 @@ export const resetPassword = async (req,res)=>{
 
 
 export const changePassword = async (req,res)=>{
-    const {email,oldPassword,newPassword} = req.body
-    let user = await userService.getUserByEmail(email)
+    try {
+        const {email,oldPassword,newPassword, role} = req.body
+    var user;
+        switch(role) {
+          case "DOCTOR":
+              const hospital = await hospitalService.getHospitalById(req.body?.hospital_id);
+              user = hospital.doctors.find(doc => doc.email == email);
+              break;
+          case "PATIENT":
+            user = await userService.getUserByEmail(email);
+             break;
+          case "SUPER":
+             user = await userService.getUserByEmail(email);
+             break;
+          case "ADMIN":
+              const hospital_ = await hospitalService.getHospitalById(req.body?.hospital_id);
+              user = hospital_.admin;
+              break;
+        }
     
-    if(!user.email_verified)
-        return res.status(403).json({ error: "Sorry this user email is not  verified" });
+    // if(!user.email_verified)
+    //     return res.status(403).json({ message: "Sorry this user email is not  verified" });
 
     const isPasswordValid = await bcrypt.compare(oldPassword, user.password)
-    if(!isPasswordValid) return res.status(400).json({ error: 'Incorrect Password Try again' });
+    if(!isPasswordValid) return res.status(400).json({ message: 'Incorrect Password Try again' });
 
     //hashing the passwords
     const saltRounds = 10
     const salt = await bcrypt.genSalt(saltRounds)
     const hash = await bcrypt.hash(newPassword, salt)
 
-    user = await userService.updateUser(user.id,{password: hash})
-    if(user){
-        return res.status(200).json({status:'success',message:"Password Updated successfully !!! " });
-    }else{
-        return res.status(500).json({ error: 'An error occured while updating password' });
+    user = await userService.updateUser(user._id,{password: hash})
+    return res.status(200).json({status:'success',message:"Password Updated successfully !!! " });
+    } catch(error) {
+        console.log(error)
+        res.status(500).json({message: error.message})
     }
 }
 

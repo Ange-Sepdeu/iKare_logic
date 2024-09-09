@@ -114,6 +114,15 @@ export const getUserById = async (req, res) => {
   }
 };
 
+export const getPatients = async(req, res) => {
+    try {
+        const patients = await userService.getAllUsers();
+        return res.status(200).json({message: "Success !", data: patients});
+    } catch(error) {
+        return res.status(500).json({message: error.message});
+    }
+};
+
 export const updateUser = async (req, res) => {
   try {
     let user = await userService.updateUser(req.params.id, req.body);

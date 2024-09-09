@@ -4,19 +4,21 @@ import * as hospitalService from "../services/hospital.service.js";
 import * as userService from "../services/user.service.js"
 
 export const startConsultation = async(req, res) => {
-    const {room, doctor, patient, appointment} = req.body;
+    const {room, doctor, patient, appointment, hospital} = req.body;
     try {
       const emailPatient = patient
       const patientObject = await userService.getUserByEmail(emailPatient);
       const hospitalObj = await hospitalService.getHospitalById(hospital?._id);
-      const doctorObj = hospitalObj.doctors.find(doc => doc._id === doctor?._id);
+      const doctorObj = hospitalObj.doctors.find(doc => doc._id == doctor?._id);
       doctorObj.appointments.forEach(appt => {
+        appt.consultation = {}
         if (appt.commonId === appointment?.commonId) {
           appt.consultation.room=room;
           appt.consultation.user=patientObject?.fullname;
         }
       })
       patientObject.appointments.forEach(appt => {
+        appt.consultation = {}
         if (appt.commonId === appointment?.commonId) {
           appt.consultation.room=room;
           appt.consultation.user = doctor?.fullname
@@ -37,9 +39,9 @@ export const startConsultation = async(req, res) => {
 export const endConsultation = async (req, res) => {
   const {room, doctor, patient, appointment} = req.body;
   try {
-    const patientObject = await userService.getUserByEmail(patient?.email);
+    const patientObject = await userService.getOneUser({fullname: patient});
     const hospitalObj = await hospitalService.getHospitalById(hospital?._id);
-    const doctorObj = hospitalObj.doctors.find(doc => doc._id === doctor?._id);
+    const doctorObj = hospitalObj.doctors.find(doc => doc._id == doctor?._id);
     doctorObj.appointments.forEach(appt => {
       if (appt.commonId === appointment?.commonId) {
         appt.consultation.status="DONE"
@@ -63,11 +65,12 @@ export const endConsultation = async (req, res) => {
 }
 
 export const issuePrescription = async(req, res) => {
-    const {doctor, hospital, prescription, patient, appointment} = req.body;
     try {
-      const patientObject = await userService.getUserByEmail(patient);
+      const {doctor, hospital, prescription, patient, appointment} = req.body;
+      console.log(req.body)
+      const patientObject = await userService.getOneUser({fullname: patient});
       const hospitalObj = await hospitalService.getHospitalById(hospital?._id);
-      const doctorObj = hospitalObj.doctors.find(doc => doc._id === doctor?._id);
+      const doctorObj = hospitalObj.doctors.find(doc => doc._id == doctor?._id);
       patientObject.appointments.forEach(appt => {
           if(appt.commonId === appointment?.commonId) {
               appt.consultation.prescription = prescription;
@@ -100,7 +103,7 @@ export const deletePrescription = async (req, res) => {
     try {
       const patientObject = await userService.getUserByEmail(patient);
       const hospitalObj = await hospitalService.getHospitalById(hospital?._id);
-      const doctorObj = hospitalObj.doctors.find(doc => doc._id === doctor?._id);
+      const doctorObj = hospitalObj.doctors.find(doc => doc._id == doctor?._id);
       patientObject.appointments.forEach(appt => {
           if(appt.commonId === appointment?.commonId) {
               appt.consultation.prescription = [];
@@ -124,8 +127,8 @@ export const deletePrescription = async (req, res) => {
 }
 
 export const sendFollowUpForm = async(req, res) => {
-    const {source, destination, communication, consultation} = req.body;
     try {
+        const {source, destination, communication, consultation} = req.body;
         const user = await userService.getUserById(destination)
         user.appointments.forEach(userAppt => {
             if(userAppt.consultation?._id == consultation)
@@ -146,18 +149,20 @@ export const sendFollowUpForm = async(req, res) => {
 export const responseToForm = async(req, res) => {
       const {patient, followup, consultation} = req.body;
       try {
+        console.log(req.body)
           const patientObject = await userService.getUserById(patient?._id);
           patientObject?.appointments.forEach(appt => {
             if (appt.consultation?._id == consultation) {
-                const followUps = appt.consultation?.prescription?.followup
-                followUps.forEach(fUp => {
-                  if (fUp?._id == followup?._id)
-                  {
-                    fUp.communication = followup?.communication
-                  }
-                })
+                appt.consultation.prescription.followup = followup
+                // followUps.forEach(fUp => {
+                //   if (fUp._id == followup?._id)
+                //   {
+                //     fUp.communication = followup?.communication
+                //   }
+                // })
             }
           })
+          await patientObject.save()
           return res.json({message: "Response sent successfully !"}).status(200);
       } catch(error) {
         console.log(error);

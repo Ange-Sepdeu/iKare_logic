@@ -109,6 +109,14 @@ export const userSchema = new Schema({
     type: String,
     default: null
   },
+  botSocket: {
+    type: String,
+    default: null
+  },
+  mobileBotSocket: {
+    type: String,
+    default: null
+  },
   status: {
     type: String,
     enum: ['PENDING', 'ACTIVE', 'INACTIVE'],

@@ -21,6 +21,12 @@ const PaymentSchema = new Schema({
     tel: {
         type: String
     },
+    reference: {
+        type: String
+    },
+    doctor: {
+        type: String
+    },
     date: {
         type: Date,
         default: Date.now

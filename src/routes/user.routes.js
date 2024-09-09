@@ -1,15 +1,20 @@
 import express from 'express'
-import { getAllUsers,createUser,getUserById,updateUser,deleteUser, bookAppointment, updateAppointmentDetails, respondToAppointment, deleteAppointment, registerSuperAdmin, setReadMessages } from '../controllers/user.controller.js';
+import { getAllUsers,createUser,getUserById,updateUser,deleteUser, bookAppointment, updateAppointmentDetails, respondToAppointment, deleteAppointment, registerSuperAdmin, setReadMessages, getPatients } from '../controllers/user.controller.js';
 import { auth } from '../middleware/auth.js';
 import { deletePrescription, endConsultation, issuePrescription, responseToForm, sendFollowUpForm, startConsultation} from '../controllers/consultation.controller.js';
 import { addEhr } from '../controllers/ehr.controller.js';
 import {initiatePayment} from "../controllers/payment.controller.js";
+import { changePassword } from '../controllers/auth.controller.js';
+import { changePicture } from '../controllers/settings.controller.js';
 
 const router = express.Router()
 
 router.route("/get-users").get(getAllUsers)
+router.route("/patients").get(getPatients);
 router.route("/add-super").post(registerSuperAdmin);
 router.route("/register").post(createUser);
+router.route("/change-password").put(changePassword);
+router.route("/change-picture").put(changePicture);
 // router.route("/:id").get(getUserById).patch(auth,updateUser).delete(auth,deleteUser);
 router.route("/get-singleuser").post(getUserById)
 router.route("/update-delete").patch(updateUser).post(deleteUser);

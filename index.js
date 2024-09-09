@@ -20,6 +20,7 @@ import path from "path"
 import { fileURLToPath } from 'url';
 import fs from "fs"
 import {uploadFile} from "./src/utils/saveFile.js"
+import axios from 'axios';
 
 const url = `mongodb://${config.dbhost}:${config.dbport}/${config.dbname}`;
 //const url = process.env.MONGODB_URI;
@@ -134,6 +135,22 @@ serverio.on('connection', (socket) => {
         }
         socket.join(room)
     })
+    socket.on("send-bot-id", async(data) => {
+        const room = randomId()
+        if (data.userRole=="PATIENT") {
+            const updated = await userSchema.findByIdAndUpdate(data._id, {botSocket:room})
+        }
+        else if (data.userRole == "DOCTOR") {
+            const hospital = await hospitalService.getHospitalById(data.hospital_id);
+            hospital.doctors.forEach(doctor => {
+                if (doctor._id == data._id){
+                    doctor.botSocket = room
+                }
+            })
+            const saved = await hospital.save()
+        }
+        socket.join(room)
+    })
     socket.on("send-mobile-socket", async(data) => {
         const room = randomId()
         if (data.userRole=="PATIENT") {
@@ -144,6 +161,22 @@ serverio.on('connection', (socket) => {
             hospital.doctors.forEach(doctor => {
                 if (doctor._id == data._id){
                     doctor.mobileSocket = room
+                }
+            })
+            const saved = await hospital.save()
+        }
+        socket.join(room)
+    })
+    socket.on("send-mobile-bot-socket", async(data) => {
+        const room = randomId()
+        if (data.userRole=="PATIENT") {
+            const updated = await userSchema.findByIdAndUpdate(data._id, {mobileBotSocket:room})
+        }
+        else if (data.userRole == "DOCTOR") {
+            const hospital = await hospitalService.getHospitalById(data.hospital_id);
+            hospital.doctors.forEach(doctor => {
+                if (doctor._id == data._id){
+                    doctor.mobileBotSocket = room
                 }
             })
             const saved = await hospital.save()
@@ -199,6 +232,55 @@ serverio.on('connection', (socket) => {
             const receiverSocketId = receiverObject.socket
             serverio.to(receiverSocketId).to(receiverObject.mobileSocket).emit("private-message", {sender, message, time, documents:[]})
             const senderObject = await getAndSaveObject(sender, {...data, date: new Date(time)});
+        }
+        catch(error) {
+            console.log(error)
+        }    
+    })
+    socket.on("send-bot-message", async(data) => {
+        const sender = data?.sender
+        const receiver = data?.receiver
+        const message = data?.message
+        const time = data?.time
+        try {
+            const djangoUrl = "http://127.0.0.1:8000/api/diseases/";
+            const response = await axios.post(djangoUrl, {symptoms: message});
+            const hospitals = await hospitalService.getAllHospitals()
+            var receiverObject;
+            for (let hospital of hospitals) {
+                const receiver = hospital.doctors.find(doc => doc._id == sender);
+                if (receiver) {
+                    receiverObject = receiver;
+                }
+            }
+            const receiverSocketId = receiverObject.botSocket
+            // socket.join(receiverSocketId)
+            // console.log("RESPONSE: ", response.data, "SENDER/RECEIVER :", receiverSocketId)
+            serverio.to(receiverSocketId).emit("private-bot-message", {receiver:sender, sender:receiver, message:response.data.data.final_prediction.toString(), time, documents:[]})
+        }
+        catch(error) {
+            console.log(error)
+        }    
+    })
+    socket.on("send-mobile-bot-message", async(data) => {
+        const sender = data?.sender
+        const receiver = data?.receiver
+        const message = data?.message
+        const time = data?.time
+        try {
+            const djangoUrl = "http://127.0.0.1:8000/api/diseases/";
+            const response = await axios.post(djangoUrl, {symptoms: message});
+            const hospitals = await hospitalService.getAllHospitals()
+            var receiverObject;
+            for (let hospital of hospitals) {
+                const receiver = hospital.doctors.find(doc => doc._id == sender);
+                if (receiver) {
+                    receiverObject = receiver;
+                }
+            }
+            console.log("RESPONSE: ", response.data)
+            const receiverSocketId = receiverObject.mobileBotSocket
+            serverio.to(receiverSocketId).emit("private-bot-message", {receiver:sender, sender:receiver, message:response.data.data.final_prediction.toString(), time, documents:[]})
         }
         catch(error) {
             console.log(error)
