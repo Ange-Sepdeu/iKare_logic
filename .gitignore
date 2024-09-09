@@ -1,3 +1,6 @@
 node_modules
 package-lock.json
-src/uploads
+src/uploads/
+.env
+.gitignore
+.env.local
